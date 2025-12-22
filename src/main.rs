@@ -19,32 +19,19 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
 
 // Usage: your_program.sh decode "<encoded_value>"
 fn main() {
-    loop {
-        io::stdout().flush().unwrap();
+    let args: Vec<String> = env::args().collect();
+    let command_string = &args[1];
 
-        let mut buffer = String::new();
-        let stdin = stdin();
-        stdin
-            .read_line(&mut buffer)
-            .ok()
-            .expect("Failed to read line");
+    let Ok(command) = Commands::from_str(command_string) else {
+        println!("unknown command: {}", args[1]);
+        return ();
+    };
 
-        let input = buffer.trim();
-        let parts = input.split(" ").collect::<Vec<_>>();
-        // let command_string = &parts[0];
-        let encoded_string = &parts[0];
-
-        let Ok(command) = Commands::from_str("decode") else {
-            println!("unknown command: {}", "decode");
-            return ();
-        };
-
-        match command {
-            Commands::Decode => {
-                let encoded_value = encoded_string;
-                let decoded_value = decode_bencoded_value(encoded_value);
-                println!("{}", decoded_value.to_string());
-            }
+    match command {
+        Commands::Decode => {
+            let encoded_value = &args[2];
+            let decoded_value = decode_bencoded_value(encoded_value);
+            println!("{}", decoded_value.to_string());
         }
     }
 }
