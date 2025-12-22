@@ -1,22 +1,18 @@
 use std::{env, str::FromStr};
 
-use serde_json::Number;
-
-use crate::{commands::Commands, types::bencode_types::BencodeTypes};
+use crate::{
+    commands::Commands,
+    types::bencode_types::{BencodeTypes, ToJSON},
+};
 
 mod commands;
 mod types;
 
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
-    let Ok(decoded) = BencodeTypes::from_str(encoded_value) else {
-        panic!("Unhandled encoded value: {}", encoded_value);
-    };
+    let decoded = BencodeTypes::parse(encoded_value).pop().unwrap();
 
-    match decoded {
-        BencodeTypes::ByteString(string) => serde_json::Value::String(string.to_string()),
-        BencodeTypes::Integer(number) => serde_json::Value::Number(Number::from(number)),
-    }
+    decoded.serialize()
 }
 
 // Usage: your_program.sh decode "<encoded_value>"
