@@ -1,20 +1,20 @@
-use std::env;
+use std::{env, str::FromStr};
 
-// Available if you need it!
-// use serde_bencode
+use serde_json::Number;
+
+use crate::types::bencode_types::BencodeTypes;
+
+mod types;
 
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
-    // If encoded_value starts with a digit, it's a number
-    if encoded_value.chars().next().unwrap().is_ascii_digit() {
-        // Example: "5:hello" -> "hello"
-        let colon_index = encoded_value.find(':').unwrap();
-        let number_string = &encoded_value[..colon_index];
-        let number = number_string.parse::<usize>().unwrap();
-        let string = &encoded_value[colon_index + 1..colon_index + 1 + number];
-        serde_json::Value::String(string.to_string())
-    } else {
-        panic!("Unhandled encoded value: {}", encoded_value)
+    let Ok(decoded) = BencodeTypes::from_str(encoded_value) else {
+        panic!("Unhandled encoded value: {}", encoded_value);
+    };
+
+    match decoded {
+        BencodeTypes::ByteString(string) => serde_json::Value::String(string.to_string()),
+        BencodeTypes::Integer(number) => serde_json::Value::Number(Number::from(number)),
     }
 }
 
