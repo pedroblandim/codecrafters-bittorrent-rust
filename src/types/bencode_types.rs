@@ -59,7 +59,7 @@ fn parse(encoded_value: &str) -> Option<(BencodeTypes, usize)> {
         // ex.: li42ee -> [42]
         let mut elements_string_option = encoded_value.get(1..); // removes the 'l'
         let mut values = vec![];
-        let mut total_len = 1; // count the removed 'l'
+        let mut total_len = 2; // count the removed 'l' and the 'e' at the end
 
         loop {
             let Some(elements_string) = elements_string_option else {
@@ -73,7 +73,7 @@ fn parse(encoded_value: &str) -> Option<(BencodeTypes, usize)> {
             values.push(value);
             total_len += len;
 
-            elements_string_option = elements_string.get(len..);
+            elements_string_option = elements_string.get(len..); // go to next element on the list
         }
 
         Some((BencodeTypes::List(values), total_len))
