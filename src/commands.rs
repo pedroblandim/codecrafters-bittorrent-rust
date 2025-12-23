@@ -4,15 +4,16 @@ pub mod decode;
 
 pub enum Commands {
     Decode,
+    Info,
 }
 
 impl FromStr for Commands {
-    type Err = ();
+    type Err = String;
     fn from_str(command: &str) -> Result<Self, Self::Err> {
-        if command == "decode" {
-            Ok(Commands::Decode)
-        } else {
-            Err(())
+        match command {
+            "decode" => Ok(Commands::Decode),
+            "info" => Ok(Commands::Info),
+            other => Err(format!("Invalid command {other}")),
         }
     }
 }

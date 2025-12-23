@@ -4,9 +4,9 @@ use serde_json::{Map, Number, Value};
 
 pub enum BencodeTypes {
     Integer(isize),
-    ByteString(String),
+    ByteString(Vec<u8>),
     List(Vec<BencodeTypes>),
-    Dictionary(HashMap<String, BencodeTypes>),
+    Dictionary(HashMap<Vec<u8>, BencodeTypes>),
 }
 
 pub trait ToJSON {
@@ -17,7 +17,9 @@ impl ToJSON for BencodeTypes {
     fn serialize(&self) -> Value {
         match self {
             Self::Integer(number) => serde_json::Value::Number(Number::from(*number)),
-            Self::ByteString(string) => serde_json::Value::String(string.clone()),
+            Self::ByteString(string) => {
+                serde_json::Value::String(String::from_utf8_lossy(string).to_string())
+            }
             Self::List(elements) => {
                 let elements_json_array = elements.iter().map(|e| e.serialize()).collect();
                 serde_json::Value::Array(elements_json_array)
@@ -26,7 +28,8 @@ impl ToJSON for BencodeTypes {
                 let mut elements_map: Map<String, serde_json::Value> = Map::new();
 
                 elements.iter().for_each(|(k, v)| {
-                    elements_map.insert(k.to_owned(), v.serialize());
+                    let k_string = String::from_utf8_lossy(k).to_string();
+                    elements_map.insert(k_string, v.serialize());
                 });
 
                 serde_json::Value::Object(elements_map)
@@ -36,50 +39,58 @@ impl ToJSON for BencodeTypes {
 }
 
 impl BencodeTypes {
-    pub fn parse(encoded_value: &str) -> Self {
+    pub fn parse(encoded_value: Vec<u8>) -> Self {
         parse(encoded_value).unwrap().0
     }
 }
 
-fn parse(encoded_value: &str) -> Option<(BencodeTypes, usize)> {
-    let first_char = encoded_value.chars().next().unwrap();
+fn parse(encoded_value: Vec<u8>) -> Option<(BencodeTypes, usize)> {
+    let first_char = encoded_value.iter().next().unwrap();
 
     if first_char.is_ascii_digit() {
         // ex.: 5:hello -> hello
-        let colon_index = encoded_value.find(':').unwrap();
-        let number_string = &encoded_value[..colon_index];
-        let number = number_string.parse::<usize>().unwrap();
-        let string = &encoded_value[colon_index + 1..colon_index + 1 + number];
+        let colon_index = encoded_value.find(':' as u8).unwrap() as usize;
 
-        let value = BencodeTypes::ByteString(string.to_string());
-        let len = number_string.len() + string.len() + 1; // + 1 for the ':' separator
+        let number_string_u8 = &encoded_value[..colon_index]; // must be a valid UTF-8 here
+        let number_string = str::from_utf8(number_string_u8).unwrap();
+
+        let number = number_string.parse::<usize>().unwrap();
+
+        let string_bytes = &encoded_value[colon_index + 1..colon_index + 1 + number];
+
+        let string_vec_bytes: Vec<u8> = string_bytes.to_vec();
+
+        let value = BencodeTypes::ByteString(string_vec_bytes);
+        let len = number_string.len() + string_bytes.len() + 1; // + 1 for the ':' separator
 
         Some((value, len))
-    } else if first_char == 'i' {
+    } else if *first_char == ('i' as u8) {
         // ex.: i42e -> 42
 
-        let first_e_index = encoded_value.find("e").unwrap();
+        let first_e_index = encoded_value.find('e' as u8).unwrap() as usize;
 
-        let number_string = encoded_value.get(1..first_e_index).unwrap().to_owned();
+        let number_string_u8 = &encoded_value[1..first_e_index]; // must be a valid UTF-8 here
+        let number_string = str::from_utf8(number_string_u8).unwrap();
+
         let number = number_string.parse::<isize>().unwrap();
 
         let value = BencodeTypes::Integer(number);
         let len = number_string.len() + 2; // + 2 for the 'i' and 'e' separators
 
         Some((value, len))
-    } else if first_char == 'l' {
+    } else if *first_char == ('l' as u8) {
         // ex.: li42ee -> [42]
         let (values, total_len) = parse_elements_from_string(encoded_value);
 
         Some((BencodeTypes::List(values), total_len))
-    } else if first_char == 'd' {
+    } else if *first_char == ('d' as u8) {
         let (values, total_len) = parse_elements_from_string(encoded_value);
 
         if values.len() % 2 != 0 {
-            panic!("Invalid encoded value: {}", encoded_value)
+            panic!("Invalid encoded value")
         }
 
-        let mut keys: Vec<String> = vec![];
+        let mut keys: Vec<Vec<u8>> = vec![];
         let mut dict_values: Vec<BencodeTypes> = vec![];
 
         for (idx, element) in values.into_iter().enumerate() {
@@ -97,20 +108,23 @@ fn parse(encoded_value: &str) -> Option<(BencodeTypes, usize)> {
             }
         }
 
-        let mut dict: HashMap<String, BencodeTypes> = HashMap::new();
+        let mut dict: HashMap<Vec<u8>, BencodeTypes> = HashMap::new();
         for (k, v) in keys.iter().zip(dict_values.into_iter()) {
-            dict.insert(k.to_owned(), v);
+            dict.insert(k.clone(), v);
         }
 
         Some((BencodeTypes::Dictionary(dict), total_len))
-    } else if first_char == 'e' {
+    } else if *first_char == ('e' as u8) {
         None
     } else {
-        panic!("Unhandled encoded value: {}", encoded_value)
+        panic!(
+            "Unhandled encoded value: {}",
+            String::from_utf8_lossy(&encoded_value)
+        )
     }
 }
 
-fn parse_elements_from_string(encoded_value: &str) -> (Vec<BencodeTypes>, usize) {
+fn parse_elements_from_string(encoded_value: Vec<u8>) -> (Vec<BencodeTypes>, usize) {
     // should be used with lists or dictionaries
     // ex.: d3:foo3:bar5:helloi52ee -> {"hello": 52, "foo":"bar"}
     // ex.: li42ee -> [42]
@@ -124,7 +138,7 @@ fn parse_elements_from_string(encoded_value: &str) -> (Vec<BencodeTypes>, usize)
             break;
         };
 
-        let Some((value, len)) = parse(elements_string) else {
+        let Some((value, len)) = parse(elements_string.to_vec()) else {
             break;
         };
 
@@ -135,4 +149,26 @@ fn parse_elements_from_string(encoded_value: &str) -> (Vec<BencodeTypes>, usize)
     }
 
     (values, total_len)
+}
+
+impl Find for Vec<u8> {
+    fn find(&self, c: u8) -> Option<u8> {
+        let mut result: Option<u8> = None;
+
+        let mut idx = 0;
+
+        &self.iter().for_each(|u| {
+            if c == *u && result.is_none() {
+                result = Some(idx);
+            }
+
+            idx += 1;
+        });
+
+        result
+    }
+}
+
+trait Find {
+    fn find(&self, c: u8) -> Option<u8>;
 }
