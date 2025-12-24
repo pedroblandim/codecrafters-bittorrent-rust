@@ -1,50 +1,14 @@
-use std::{collections::HashMap, panic};
+use std::collections::HashMap;
 
-use serde_json::{Map, Number, Value};
-
-pub enum BencodeTypes {
-    Integer(isize),
-    ByteString(Vec<u8>),
-    List(Vec<BencodeTypes>),
-    Dictionary(HashMap<Vec<u8>, BencodeTypes>),
-}
-
-pub trait ToJSON {
-    fn serialize(&self) -> Value;
-}
-
-impl ToJSON for BencodeTypes {
-    fn serialize(&self) -> Value {
-        match self {
-            Self::Integer(number) => serde_json::Value::Number(Number::from(*number)),
-            Self::ByteString(string) => {
-                serde_json::Value::String(String::from_utf8_lossy(string).to_string())
-            }
-            Self::List(elements) => {
-                let elements_json_array = elements.iter().map(|e| e.serialize()).collect();
-                serde_json::Value::Array(elements_json_array)
-            }
-            Self::Dictionary(elements) => {
-                let mut elements_map: Map<String, serde_json::Value> = Map::new();
-
-                elements.iter().for_each(|(k, v)| {
-                    let k_string = String::from_utf8_lossy(k).to_string();
-                    elements_map.insert(k_string, v.serialize());
-                });
-
-                serde_json::Value::Object(elements_map)
-            }
-        }
-    }
-}
+use crate::bencode::bencode_types::BencodeTypes;
 
 impl BencodeTypes {
-    pub fn parse(encoded_value: Vec<u8>) -> Self {
-        parse(encoded_value).unwrap().0
+    pub fn decode(encoded_value: Vec<u8>) -> Self {
+        decode(encoded_value).unwrap().0
     }
 }
 
-fn parse(encoded_value: Vec<u8>) -> Option<(BencodeTypes, usize)> {
+fn decode(encoded_value: Vec<u8>) -> Option<(BencodeTypes, usize)> {
     let first_char = encoded_value.iter().next().unwrap();
 
     if first_char.is_ascii_digit() {
@@ -72,7 +36,7 @@ fn parse(encoded_value: Vec<u8>) -> Option<(BencodeTypes, usize)> {
         let number_string_u8 = &encoded_value[1..first_e_index]; // must be a valid UTF-8 here
         let number_string = str::from_utf8(number_string_u8).unwrap();
 
-        let number = number_string.parse::<isize>().unwrap();
+        let number = number_string.parse::<i64>().unwrap();
 
         let value = BencodeTypes::Integer(number);
         let len = number_string.len() + 2; // + 2 for the 'i' and 'e' separators
@@ -84,6 +48,7 @@ fn parse(encoded_value: Vec<u8>) -> Option<(BencodeTypes, usize)> {
 
         Some((BencodeTypes::List(values), total_len))
     } else if *first_char == ('d' as u8) {
+        // ex.: d3:foo3:bar5:helloi52ee -> {"hello": 52, "foo":"bar"}
         let (values, total_len) = parse_elements_from_string(encoded_value);
 
         if values.len() % 2 != 0 {
@@ -138,7 +103,7 @@ fn parse_elements_from_string(encoded_value: Vec<u8>) -> (Vec<BencodeTypes>, usi
             break;
         };
 
-        let Some((value, len)) = parse(elements_string.to_vec()) else {
+        let Some((value, len)) = decode(elements_string.to_vec()) else {
             break;
         };
 
@@ -157,7 +122,7 @@ impl Find for Vec<u8> {
 
         let mut idx = 0;
 
-        &self.iter().for_each(|u| {
+        self.iter().for_each(|u| {
             if c == *u && result.is_none() {
                 result = Some(idx);
             }
