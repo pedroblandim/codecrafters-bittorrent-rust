@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::{Map, Number, Value};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BencodeTypes {
     Integer(i64),
     ByteString(Vec<u8>),

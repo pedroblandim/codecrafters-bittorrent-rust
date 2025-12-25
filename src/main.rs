@@ -37,34 +37,42 @@ fn main() {
                 None => "sample.torrent",
             };
 
-            let contents = fs::read(file_path).expect(&format!("Could not read file {file_path}"));
+            let content = fs::read(file_path).expect(&format!("Could not read file {file_path}"));
 
-            let decoded_value = BencodeTypes::decode(contents.clone());
+            let content_decoded = BencodeTypes::decode(content.clone());
 
-            let decoded_json = decoded_value.serialize_to_json();
+            let info_encoded;
+            let announce;
+            let length;
 
-            let info = decoded_json.get("info").unwrap();
+            match content_decoded {
+                BencodeTypes::Dictionary(map) => {
+                    let info_decoded = map.get(&b"info".to_vec()).unwrap().clone();
+                    info_encoded = BencodeTypes::encode(&info_decoded);
 
-            let deserialized_info = BencodeTypes::deserialize_from_json(info).unwrap();
+                    announce = match map.get(&b"announce".to_vec()).unwrap().clone() {
+                        BencodeTypes::ByteString(string) => string,
+                        _ => panic!("error"),
+                    };
 
-            // let mut encoded_info = b"".to_vec();
-            // encoded_info.append(&mut BencodeTypes::encode(&deserialized_info));
-            // encoded_info.append(&mut b"".to_vec());
+                    length = match info_decoded {
+                        BencodeTypes::Dictionary(map) => {
+                            match map.get(&b"length".to_vec()).unwrap().clone() {
+                                BencodeTypes::Integer(number) => number,
+                                _ => panic!("error"),
+                            }
+                        }
+                        _ => panic!("error"),
+                    };
+                }
+                _ => panic!("error"),
+            };
 
-            let encoded_info = BencodeTypes::encode(&deserialized_info);
+            let info_encoded_hash = Sha1::digest(info_encoded.clone());
 
-            let info_hash = Sha1::digest(encoded_info.clone());
-
-            println!(
-                "Tracker URL: {}",
-                decoded_json
-                    .get("announce")
-                    .unwrap()
-                    .to_string()
-                    .trim_matches('\"')
-            );
-            println!("Length: {}", info.get("length").unwrap());
-            println!("Info Hash: {info_hash:x}");
+            println!("Tracker URL: {}", String::from_utf8_lossy(&announce));
+            println!("Length: {}", length);
+            println!("Info Hash: {info_encoded_hash:x}");
         }
     }
 }
