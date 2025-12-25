@@ -31,33 +31,4 @@ impl BencodeTypes {
             }
         }
     }
-
-    pub fn deserialize_from_json(value: &Value) -> Option<Self> {
-        match value {
-            Value::Number(number) => Some(BencodeTypes::Integer(number.as_i64().unwrap())),
-            Value::String(string) => Some(BencodeTypes::ByteString(string.clone().into_bytes())),
-
-            Value::Array(elements) => {
-                let deserialized_elements = elements
-                    .iter()
-                    .map(|e| BencodeTypes::deserialize_from_json(e))
-                    .filter(|o| o.is_some())
-                    .map(|o| o.unwrap())
-                    .collect::<Vec<BencodeTypes>>();
-                Some(BencodeTypes::List(deserialized_elements))
-            }
-            Value::Object(dict) => {
-                let mut deserialized_entries_map: HashMap<Vec<u8>, BencodeTypes> = HashMap::new();
-
-                for (k, v) in dict.iter() {
-                    let k_bytes = k.clone().into_bytes();
-                    let v_bytes = BencodeTypes::deserialize_from_json(v).unwrap();
-                    deserialized_entries_map.insert(k_bytes, v_bytes);
-                }
-
-                Some(BencodeTypes::Dictionary(deserialized_entries_map))
-            }
-            _ => None,
-        }
-    }
 }
