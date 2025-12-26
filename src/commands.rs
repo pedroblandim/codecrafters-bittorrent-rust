@@ -1,7 +1,5 @@
 use std::str::FromStr;
 
-pub mod decode;
-
 pub enum Commands {
     Decode,
     Info,
