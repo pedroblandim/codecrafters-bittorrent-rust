@@ -1,6 +1,9 @@
 use std::fs;
 use std::{env, str::FromStr};
 
+use sha1::digest::consts::{B0, B1};
+use sha1::digest::generic_array::GenericArray;
+use sha1::digest::typenum::{UInt, UTerm};
 use sha1::{Digest, Sha1};
 
 use crate::{bencode::bencode_types::BencodeTypes, commands::Commands};
@@ -48,9 +51,23 @@ fn main() {
             let info_encoded = BencodeTypes::encode(info);
             let info_encoded_hash = Sha1::digest(info_encoded.clone());
 
+            let piece_length = info.get_integer("piece length");
+
+            let pieces_string = info.get_byte_string("pieces");
+
+            let pieces = pieces_string.chunks(20);
+
             println!("Tracker URL: {}", String::from_utf8_lossy(&announce));
             println!("Length: {}", length);
             println!("Info Hash: {info_encoded_hash:x}");
+            println!("Piece Length: {piece_length}");
+
+            println!("Piece Hashes:");
+            pieces.for_each(|p| {
+                let ga: GenericArray<u8, UInt<UInt<UInt<UInt<UInt<UTerm, B1>, B0>, B1>, B0>, B0>> =
+                    GenericArray::clone_from_slice(p);
+                println!("{:x}", ga);
+            });
         }
     }
 }
