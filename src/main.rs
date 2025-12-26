@@ -41,33 +41,11 @@ fn main() {
 
             let content_decoded = BencodeTypes::decode(content.clone());
 
-            let info_encoded;
-            let announce;
-            let length;
+            let announce = content_decoded.get_byte_string("announce");
+            let info = content_decoded.get_dict("info");
+            let length = info.get_integer("length");
 
-            match content_decoded {
-                BencodeTypes::Dictionary(map) => {
-                    let info_decoded = map.get(&b"info".to_vec()).unwrap().clone();
-                    info_encoded = BencodeTypes::encode(&info_decoded);
-
-                    announce = match map.get(&b"announce".to_vec()).unwrap().clone() {
-                        BencodeTypes::ByteString(string) => string,
-                        _ => panic!("error"),
-                    };
-
-                    length = match info_decoded {
-                        BencodeTypes::Dictionary(map) => {
-                            match map.get(&b"length".to_vec()).unwrap().clone() {
-                                BencodeTypes::Integer(number) => number,
-                                _ => panic!("error"),
-                            }
-                        }
-                        _ => panic!("error"),
-                    };
-                }
-                _ => panic!("error"),
-            };
-
+            let info_encoded = BencodeTypes::encode(info);
             let info_encoded_hash = Sha1::digest(info_encoded.clone());
 
             println!("Tracker URL: {}", String::from_utf8_lossy(&announce));
