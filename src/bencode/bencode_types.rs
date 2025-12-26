@@ -11,33 +11,33 @@ pub enum BencodeTypes {
 }
 
 impl BencodeTypes {
-    pub fn get_byte_string(&self, key: &str) -> Vec<u8> {
+    pub fn get_byte_string(&self, key: &str) -> Option<Vec<u8>> {
         let key_bytes = key.as_bytes().to_vec();
-        let bencode_type = self.get(&key_bytes);
+        let bencode_type = self.get(&key_bytes)?;
 
         match bencode_type {
-            BencodeTypes::ByteString(string) => string.to_owned(),
+            BencodeTypes::ByteString(string) => Some(string.to_owned()),
             BencodeTypes::Integer(_) => panic!("Key {key} maps to an Integer"),
             BencodeTypes::List(_) => panic!("Key {key} maps to a List"),
             BencodeTypes::Dictionary(_) => panic!("Key {key} maps to a Dictionary"),
         }
     }
 
-    pub fn get_integer(&self, key: &str) -> i64 {
+    pub fn get_integer(&self, key: &str) -> Option<i64> {
         let key_bytes = key.as_bytes().to_vec();
-        let bencode_type = self.get(&key_bytes);
+        let bencode_type = self.get(&key_bytes)?;
 
         match bencode_type {
             BencodeTypes::ByteString(_) => panic!("Key {key} maps to an ByteString"),
-            BencodeTypes::Integer(number) => *number,
+            BencodeTypes::Integer(number) => Some(*number),
             BencodeTypes::List(_) => panic!("Key {key} maps to a List"),
             BencodeTypes::Dictionary(_) => panic!("Key {key} maps to a Dictionary"),
         }
     }
 
-    pub fn get_dict(&self, key: &str) -> &BencodeTypes {
+    pub fn get_dict(&self, key: &str) -> Option<&BencodeTypes> {
         let key_bytes = key.as_bytes().to_vec();
-        let bencode_type = self.get(&key_bytes);
+        let bencode_type = self.get(&key_bytes)?;
 
         match bencode_type {
             BencodeTypes::ByteString(_) => panic!("Key {key} maps to an ByteString"),
@@ -46,13 +46,13 @@ impl BencodeTypes {
             BencodeTypes::Dictionary(_) => (),
         }
 
-        bencode_type
+        Some(bencode_type)
     }
 
     #[allow(dead_code)]
-    pub fn get_list(&self, key: &str) -> &BencodeTypes {
+    pub fn get_list(&self, key: &str) -> Option<&BencodeTypes> {
         let key_bytes = key.as_bytes().to_vec();
-        let bencode_type = self.get(&key_bytes);
+        let bencode_type = self.get(&key_bytes)?;
 
         match bencode_type {
             BencodeTypes::ByteString(_) => panic!("Key {key} maps to an ByteString"),
@@ -61,12 +61,12 @@ impl BencodeTypes {
             BencodeTypes::Dictionary(_) => panic!("Key {key} maps to a Dictionary"),
         }
 
-        bencode_type
+        Some(bencode_type)
     }
 
-    fn get(&self, key: &Vec<u8>) -> &BencodeTypes {
+    fn get(&self, key: &Vec<u8>) -> Option<&BencodeTypes> {
         match &self {
-            BencodeTypes::Dictionary(map) => map.get(key).expect("Key {key} not found"),
+            BencodeTypes::Dictionary(map) => map.get(key),
             _ => panic!("Calling get on a BencodeType that is not a Dictionary"),
         }
     }
