@@ -5,6 +5,7 @@ pub mod decode;
 pub enum Commands {
     Decode,
     Info,
+    Peers,
 }
 
 impl FromStr for Commands {
@@ -13,6 +14,7 @@ impl FromStr for Commands {
         match command {
             "decode" => Ok(Commands::Decode),
             "info" => Ok(Commands::Info),
+            "peers" => Ok(Commands::Peers),
             other => Err(format!("Invalid command {other}")),
         }
     }
